@@ -74,7 +74,7 @@ p(n, n', l) = π√(8/(2l+1)) · Σₘ cₙₗₘ* · cₙ'ₗₘ
 
 ## Training Results
 
-Trained on **27,300 structures** (546 trajectories × 50 snapshots).
+To accommodate standard hardware limits (e.g., Kaggle's 14 GB RAM and 9-hour timeout) while preserving the dataset's physical diversity, the model was trained on a **representative subset of 27,300 structures (5.46 million atoms)**, sampled evenly across all 546 trajectories (50 snapshots per trajectory).
 
 ### Dimensionality Reduction
 

@@ -253,7 +253,9 @@
         fingerprints, reduces dimensionality via Incremental PCA, and performs clustering via K-Means++. The dataset
         consists of 22.9 million carbon atoms <span class="citation">[2]</span> generated from molecular dynamics
         simulations using the C-GAP-17 potential <span class="citation">[3]</span>, covering densities of 1.0–3.5 g/cm³.
-        Training on 27,300 structures yielded 252 SOAP features compressed to 15 principal components, producing K=3
+        To accommodate computational constraints (e.g., 14 GB RAM and 9-hour runtime limits) while preserving structural
+        diversity, the model was trained on a representative subset of 27,300 structures (5.46 million atoms). This
+        yielded 252 SOAP features compressed to 15 principal components, producing K=3
         clusters that correspond to distinct carbon phases characterizable by density and local bonding environment.
     </div>
 
@@ -341,7 +343,8 @@
     <p>The dataset used is the <strong>22.9 million carbon atom dataset</strong> by Gardner, Faure Beaulieu & Deringer
         <span class="citation">[2]</span>. Structures were generated via melt-quench-anneal MD simulations using LAMMPS
         <span class="citation">[4]</span> with the C-GAP-17 Gaussian Approximation Potential <span
-            class="citation">[3]</span>.</p>
+            class="citation">[3]</span>.
+    </p>
 
     <table>
         <tr>
@@ -467,7 +470,8 @@
     <p>MiniBatch K-Means <span class="citation">[8]</span> with K-Means++ initialization <span
             class="citation">[9]</span> is applied. The optimal K is selected by maximizing the Silhouette Coefficient
         <span class="citation">[10]</span>, with the Davies-Bouldin Index <span class="citation">[11]</span> as a
-        secondary metric.</p>
+        secondary metric.
+    </p>
 
     <!-- ============================================================ -->
     <h2 id="s4">Experimental Setup</h2>
@@ -487,7 +491,7 @@
         </tr>
         <tr>
             <td>Snapshots per trajectory</td>
-            <td>50</td>
+            <td>50 (sampled uniformly from 210 max)</td>
         </tr>
         <tr>
             <td>Total structures</td>
@@ -556,7 +560,7 @@
         <tr>
             <td>Dataset</td>
             <td>134k organic molecules</td>
-            <td>27.3k pure C structures</td>
+            <td>27.3k structures (5.46M pure C atoms)</td>
         </tr>
         <tr>
             <td>Atoms/structure</td>
@@ -623,15 +627,19 @@
                 href="https://arxiv.org/abs/2211.16443">arxiv.org/abs/2211.16443</a></p>
         <p>[3] Deringer, V.L., Csányi, G. (2017). Machine learning based interatomic potential for amorphous carbon.
             <em>Phys. Rev. B</em>, 95(9), 094203. <a
-                href="https://doi.org/10.1103/PhysRevB.95.094203">doi:10.1103/PhysRevB.95.094203</a></p>
+                href="https://doi.org/10.1103/PhysRevB.95.094203">doi:10.1103/PhysRevB.95.094203</a>
+        </p>
         <p>[4] Thompson, A.P. et al. (2022). LAMMPS — a flexible simulation tool for particle-based materials modeling.
             <em>Comput. Phys. Commun.</em>, 271, 108171. <a
-                href="https://doi.org/10.1016/j.cpc.2021.108171">doi:10.1016/j.cpc.2021.108171</a></p>
+                href="https://doi.org/10.1016/j.cpc.2021.108171">doi:10.1016/j.cpc.2021.108171</a>
+        </p>
         <p>[5] Himanen, L. et al. (2020). DScribe: Library of descriptors for machine learning in materials science.
             <em>Comput. Phys. Commun.</em>, 247, 106949. <a
-                href="https://doi.org/10.1016/j.cpc.2019.106949">doi:10.1016/j.cpc.2019.106949</a></p>
+                href="https://doi.org/10.1016/j.cpc.2019.106949">doi:10.1016/j.cpc.2019.106949</a>
+        </p>
         <p>[6] Welford, B.P. (1962). Note on a method for calculating corrected sums of squares and products.
-            <em>Technometrics</em>, 4(3), 419–420.</p>
+            <em>Technometrics</em>, 4(3), 419–420.
+        </p>
         <p>[7] Ross, D.A. et al. (2008). Incremental learning for robust visual tracking. <em>Int. J. Comput. Vis.</em>,
             77(1), 125–141.</p>
         <p>[8] Sculley, D. (2010). Web-scale k-means clustering. <em>Proc. 19th Int. Conf. WWW</em>, 1177–1178.</p>
@@ -642,11 +650,13 @@
         <p>[11] Davies, D.L., Bouldin, D.W. (1979). A cluster separation measure. <em>IEEE Trans. PAMI</em>, 1(2),
             224–227.</p>
         <p>[12] Campello, R.J.G.B. et al. (2013). Density-Based Clustering Based on Hierarchical Density Estimates.
-            <em>PAKDD 2013</em>, LNAI 7819, 160–172.</p>
+            <em>PAKDD 2013</em>, LNAI 7819, 160–172.
+        </p>
         <p>[13] Xie, T., Grossman, J.C. (2018). Crystal Graph Convolutional Neural Networks. <em>Phys. Rev. Lett.</em>,
             120, 145301.</p>
         <p>[14] Drautz, R. (2019). Atomic cluster expansion for accurate and transferable interatomic potentials.
-            <em>Phys. Rev. B</em>, 99, 014104.</p>
+            <em>Phys. Rev. B</em>, 99, 014104.
+        </p>
         <p>[15] Batatia, I. et al. (2022). MACE: Higher Order Equivariant Message Passing Neural Networks. <em>NeurIPS
                 2022</em>.</p>
     </div>
