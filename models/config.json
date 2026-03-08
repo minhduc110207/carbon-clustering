@@ -1,0 +1,15 @@
+{
+  "dataset": "jla-gardner/carbon-data",
+  "soap_species": [
+    "C"
+  ],
+  "soap_rcut": 6.0,
+  "soap_nmax": 8,
+  "soap_lmax": 6,
+  "soap_sigma": 0.5,
+  "soap_average": "inner",
+  "pca_n_components": 15,
+  "best_k": 3,
+  "n_structures": 27300,
+  "n_features": 252
+}

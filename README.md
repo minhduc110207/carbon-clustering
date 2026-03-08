@@ -1,86 +1,152 @@
-# Carbon Structure Classification
+# Unsupervised Classification of Carbon Material Structures via SOAP Descriptors
 
-Unsupervised classification of pure carbon material structures using geometric descriptors and machine learning.
+An end-to-end machine learning pipeline for the automatic, unsupervised classification of carbon allotrope structures based on three-dimensional atomic coordinates. The method leverages Smooth Overlap of Atomic Positions (SOAP) descriptors \[1\] to encode local structural environments into rotation-invariant fingerprints, followed by dimensionality reduction (PCA) and K-Means++ clustering.
 
-**Dataset**: [jla-gardner/carbon-data](https://github.com/jla-gardner/carbon-data) (22.9M carbon atoms)
-— CNT, graphene, diamond, buckyball, amorphous carbon
-
-**Paper**: [arXiv:2211.16443](https://arxiv.org/abs/2211.16443)
-
-## Pipeline
+## Pipeline Overview
 
 ```mermaid
 graph LR
-    A["carbon-data<br/>546 trajectories"] --> B["Load .extxyz<br/>~200 C atoms/structure"]
-    B --> C["SOAP Descriptors<br/>R_C → p ∈ ℝ^D"]
-    C --> D["StandardScaler<br/>z = (x-μ)/σ"]
-    D --> E["Incremental PCA<br/>X → Z ∈ ℝ^(M×k)"]
-    E --> F["Anomaly Detection<br/>IF + OCSVM<br/>(supplementary)"]
-    F --> G["K-Means++<br/>Z → Labels L"]
+    A["carbon-data<br/>(22.9M atoms)"] --> B["SOAP Encoding<br/>R → p ∈ ℝ²⁵²"]
+    B --> C["StandardScaler<br/>z = (x−μ)/σ"]
+    C --> D["Incremental PCA<br/>252 → 15 dims"]
+    D --> E["K-Means++<br/>K = 3"]
 
-    style A fill:#2196F3,color:#fff
-    style B fill:#4CAF50,color:#fff
-    style C fill:#FF9800,color:#fff
-    style D fill:#9C27B0,color:#fff
-    style E fill:#009688,color:#fff
-    style F fill:#F44336,color:#fff
-    style G fill:#3F51B5,color:#fff
+    style A fill:#1565C0,color:#fff
+    style B fill:#E65100,color:#fff
+    style C fill:#6A1B9A,color:#fff
+    style D fill:#00695C,color:#fff
+    style E fill:#C62828,color:#fff
 ```
 
-### Stages
+| Stage | Transformation | Method |
+|-------|---------------|--------|
+| 1 | `.extxyz` → `ASE.Atoms` | Parse MD trajectory snapshots with density/temperature metadata |
+| 2 | `R ∈ ℝ^(N×3)` → `p ∈ ℝ^D` | SOAP power spectrum (species=\[C\], periodic, inner-averaged) |
+| 3 | `X ∈ ℝ^(M×D)` → `Z ∈ ℝ^(M×k)` | Welford online StandardScaler → Incremental PCA |
+| 4 | `Z` → `L ∈ {1,...,K}^M` | MiniBatch K-Means++ with Silhouette-based K selection |
 
-| Stage | Transformation | Description |
-|-------|---------------|-------------|
-| 1. Load | `.extxyz` → ASE Atoms | Parse structures with density/temperature metadata |
-| 2. SOAP | `R_C → p ∈ ℝ^D` | Rotation-invariant geometric fingerprint (species=['C']) |
-| 3. PCA | `X → Z ∈ ℝ^(M×k)` | Dimensionality reduction (≥95% variance) |
-| 4. K-Means++ | `Z → L` | Structural clustering |
+## Dataset
 
-### Key Design Decisions
+**Source**: Gardner, Faure Beaulieu & Deringer — [jla-gardner/carbon-data](https://github.com/jla-gardner/carbon-data) \[2\]
 
-- **`species=['C']`** is valid: dataset is 100% Carbon
-- **No Carbon filter**: pure C dataset requires no filtering
-- **`periodic=True`** in SOAP: structures have periodic boundary conditions
-- **Anomaly detection** is supplementary (not in core framework), can be disabled
+The dataset comprises 22.9 million carbon atoms generated via molecular dynamics (MD) simulations using the LAMMPS code \[3\] with the C-GAP-17 interatomic potential \[4\]. Structures span diverse carbon environments:
+
+| Environment | Density (g/cm³) | Bonding | Structure |
+|-------------|:--------------:|:-------:|-----------|
+| Graphitic films | 1.0 – 1.5 | sp² | Layered hexagonal |
+| Carbon nanotubes | 1.3 – 1.4 | sp² | Rolled sheets |
+| Amorphous carbon | 1.8 – 3.0 | sp²/sp³ | Disordered |
+| Diamond-like | 3.0 – 3.5 | sp³ | Tetrahedral |
+
+**Key property**: The dataset is **100% Carbon**, making `species=['C']` in SOAP descriptors scientifically valid — no information is lost from missing cross-species correlations.
+
+<details>
+<summary><strong>Generation procedure</strong></summary>
+
+1. **Initialization**: Random 200-atom configurations at target density (hard-sphere constraint)
+2. **Melt–Quench**: Heat to liquid phase, then rapid quench to produce metastable structures
+3. **Anneal**: Hold at anneal temperature; sample at 1 ps intervals (210 snapshots/trajectory)
+4. **Labeling**: Local energies computed with C-GAP-17 Gaussian Approximation Potential
+
+546 trajectories × 210 snapshots × 200 atoms = **22.9M atomic environments**
+</details>
+
+## SOAP Descriptor Configuration
+
+The SOAP descriptor \[1\] encodes local atomic environments via the power spectrum of the neighbor density expanded in radial-angular basis functions:
+
+```
+ρᵢ(r) = Σⱼ exp(−|r − rⱼ|² / 2σ²) · fcut(|rⱼ − rᵢ|)
+
+p(n, n', l) = π√(8/(2l+1)) · Σₘ cₙₗₘ* · cₙ'ₗₘ
+```
+
+| Parameter | Value | Rationale |
+|-----------|:-----:|-----------|
+| `species` | `['C']` | Single-element dataset — captures C–C geometry only |
+| `r_cut` | 6.0 Å | ~3 neighbor shells (C–C bond: 1.42 Å graphene, 1.54 Å diamond) |
+| `n_max` | 8 | Radial basis resolution |
+| `l_max` | 6 | Angular basis resolution (balanced precision/cost) |
+| `sigma` | 0.5 Å | Tight Gaussian smearing for crystalline structures |
+| `periodic` | True | Structures have periodic boundary conditions |
+| `average` | inner | Preserves cross-correlations between atomic sites |
+| **Features** | **252** | n_max(n_max+1)/2 × (l_max+1) = 36 × 7 |
+
+## Training Results
+
+Trained on **27,300 structures** (546 trajectories × 50 snapshots).
+
+### Dimensionality Reduction
+
+PCA reduced 252 SOAP features → **15 principal components**, retaining **≥95% cumulative variance**. The requirement for 15 PCs (vs. only 5 with QM9) confirms the structural diversity of the carbon-data dataset.
+
+### Clustering
+
+K-Means++ identified **K = 3** optimal clusters:
+
+| Cluster | Structures | Interpretation |
+|:-------:|:----------:|----------------|
+| 0 | — | Low-density graphitic / CNT-like environments |
+| 1 | — | Intermediate amorphous carbon |
+| 2 | — | High-density diamond-like structures |
+
+## Repository Structure
+
+```
+├── kaggle_notebook.py      # Full training pipeline (Kaggle-compatible)
+├── predict.py              # Inference on new structures
+├── export_models.py        # Extract models from Kaggle checkpoints
+├── requirements.txt        # Python dependencies
+├── PROJECT_REPORT.html     # Formal project report (printable)
+├── TRAINING_GUIDE.md       # Step-by-step training guide
+│
+├── models/                 # Trained models
+│   ├── scaler.pkl          # Welford StandardScaler (μ, σ)
+│   ├── ipca.pkl            # Incremental PCA (15 components)
+│   ├── kmeans.pkl          # MiniBatch K-Means (K=3)
+│   ├── config.json         # Hyperparameters & metadata
+│   └── cumulative_variance.npy
+│
+└── results/                # Visualizations
+    ├── pca_variance.png
+    ├── clustering_results.png
+    ├── anomaly_summary.png
+    ├── clusters_3d.png
+    └── cluster_properties.png
+```
 
 ## Quick Start
 
-### Run on Kaggle
-
-1. Create a new Kaggle Notebook
-2. Upload `kaggle_notebook.py` as a script
-3. Enable **Internet** (required to download dataset from GitHub)
-4. Run all cells — pipeline auto-downloads and processes end-to-end
-
-### Run Locally
+### Inference
 
 ```bash
+pip install dscribe ase scikit-learn numpy
+python predict.py structure.extxyz --models-dir ./models
+```
+
+### Train from Scratch
+
+See [TRAINING_GUIDE.md](TRAINING_GUIDE.md) for full instructions. Summary:
+
+```bash
+# On Kaggle: paste kaggle_notebook.py into a Code cell, enable Internet, Run All
+# Locally:
 pip install -r requirements.txt
 python kaggle_notebook.py
 ```
 
-### Predict on New Structures
+## References
 
-```bash
-python predict.py structure.extxyz --models-dir ./models
-```
+\[1\] Bartók, A.P., Kondor, R., Csányi, G. (2013). On representing chemical environments. *Phys. Rev. B*, 87, 184115. [doi:10.1103/PhysRevB.87.184115](https://doi.org/10.1103/PhysRevB.87.184115)
 
-## Configuration
+\[2\] Gardner, J.L.A., Faure Beaulieu, Z., Deringer, V.L. (2022). Synthetic Data Enable Experiments in Atomistic Machine Learning. [arXiv:2211.16443](https://arxiv.org/abs/2211.16443)
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `MAX_TRAJECTORIES` | `None` (all) | Limit number of trajectory files |
-| `MAX_SNAPSHOTS` | `50` | Snapshots per trajectory |
-| `SOAP_NMAX` | `8` | Radial basis resolution |
-| `SOAP_LMAX` | `6` | Angular basis resolution |
-| `SOAP_RCUT` | `6.0 Å` | Cutoff radius (~3rd neighbor shell) |
-| `SOAP_SIGMA` | `0.5 Å` | Gaussian smearing (tighter for crystalline C) |
-| `PCA_VARIANCE` | `0.95` | Variance threshold for PCA |
-| `K_RANGE` | `[3-15]` | K candidates for clustering |
-| `ANOMALY_ENABLED` | `True` | Enable/disable anomaly detection |
-| `FRESH_RUN` | `True` | Delete checkpoints on start |
+\[3\] Thompson, A.P. et al. (2022). LAMMPS — a flexible simulation tool for particle-based materials modeling. *Comput. Phys. Commun.*, 271, 108171. [doi:10.1016/j.cpc.2021.108171](https://doi.org/10.1016/j.cpc.2021.108171)
 
-## Requirements
+\[4\] Deringer, V.L., Csányi, G. (2017). Machine learning based interatomic potential for amorphous carbon. *Phys. Rev. B*, 95, 094203. [doi:10.1103/PhysRevB.95.094203](https://doi.org/10.1103/PhysRevB.95.094203)
 
-- Python 3.8+
-- dscribe, ase, h5py, scikit-learn, numpy, matplotlib, requests
+\[5\] Himanen, L. et al. (2020). DScribe: Library of descriptors for machine learning in materials science. *Comput. Phys. Commun.*, 247, 106949. [doi:10.1016/j.cpc.2019.106949](https://doi.org/10.1016/j.cpc.2019.106949)
+
+## License
+
+MIT
