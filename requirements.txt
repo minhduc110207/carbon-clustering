@@ -1,0 +1,7 @@
+dscribe
+ase
+h5py
+scikit-learn
+numpy
+matplotlib
+requests

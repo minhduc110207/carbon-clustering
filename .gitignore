@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Data (too large for git)
+data/
+*.h5
+*.hdf5
+*.tar.bz2
+*.zip
+
+# Checkpoints (session-specific)
+checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
