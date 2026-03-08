@@ -13,8 +13,15 @@ data/
 *.tar.bz2
 *.zip
 
+# Ignore temporary models/checkpoints
+models/
+results/
+
 # Checkpoints (session-specific)
 checkpoints/
+
+# Ignore local HTML reports
+*.html
 
 # OS
 .DS_Store
