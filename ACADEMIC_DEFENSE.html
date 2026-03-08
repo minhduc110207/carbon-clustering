@@ -9,12 +9,12 @@
         @import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Open+Sans:wght@400;600;700&display=swap');
 
         :root {
-            --primary: #0f204b;
-            --accent: #b31b1b;
+            --primary: #003366;
+            --accent: #2e75b6;
             --text: #111;
             --gray: #444;
-            --light-gray: #f4f6f9;
-            --border: #ccc;
+            --light-gray: #f2f7fc;
+            --border: #b8cce4;
         }
 
         * {
@@ -214,7 +214,8 @@
         matrices. The <code>r_cut</code> of 6.0 Å encompasses roughly the 3rd neighbor shell, sufficient to distinguish
         between the sp² rings of graphitic structures and the sp³ tetrahedral networks of diamond-like carbon. The tight
         Gaussian smearing (<code>sigma=0.5 Å</code>) prevents the over-blurring of localized defects in the amorphous
-        states.</p>
+        states.
+    </p>
 
     <h3>2.2 Dimensionality Reduction and Variance Embedding</h3>
     <p>Welford’s online standardization prevented feature dominance before applying Incremental Principal Component
@@ -229,7 +230,8 @@
             if both</strong> Isolation Forest and One-Class SVM independently flagged them as anomalies.
         <strong>Empirical Result:</strong> Only 570 out of 27,300 structures (2.08%) were rejected. This conservative,
         unsupervised trimming sanitizes the covariance matrix for PCA without forcefully amputating legitimate valid
-        states.</p>
+        states.
+    </p>
 
     <div class="page-break"></div>
 
@@ -317,9 +319,19 @@
         <p>[2] Bartók, A. P., Kondor, R., & Csányi, G. (2013). On representing chemical environments. <em>Physical
                 Review B</em>, 87(18), 184115.</p>
         <p>[3] Deringer, V. L., & Csányi, G. (2017). Machine learning based interatomic potential for amorphous carbon.
-            <em>Physical Review B</em>, 95(9), 094203.</p>
+            <em>Physical Review B</em>, 95(9), 094203.
+        </p>
         <p>[4] Rousseeuw, P. J. (1987). Silhouettes: a graphical aid to the interpretation and validation of cluster
             analysis. <em>Journal of Computational and Applied Mathematics</em>, 20, 53-65.</p>
+        <p>[5] Caro, M. A., Deringer, V. L., Koskinen, J., Laurila, T., & Csányi, G. (2018). Growth mechanism and origin
+            of high sp³ content in tetrahedral amorphous carbon. <em>Physical Review Letters</em>, 120(16), 166101.</p>
+        <p>[6] Himanen, L., Jäger, M. O., Morooka, E. V., Federici Canova, F., Ranawat, Y. S., Gao, D. Z., ... & Foster,
+            A. S. (2020). DScribe: Library of descriptors for machine learning in materials science. <em>Computer
+                Physics Communications</em>, 247, 106949.</p>
+        <p>[7] Arthur, D., & Vassilvitskii, S. (2007). k-means++: The advantages of careful seeding. In <em>Proceedings
+                of the eighteenth annual ACM-SIAM symposium on Discrete algorithms</em> (pp. 1027-1035).</p>
+        <p>[8] Davies, D. L., & Bouldin, D. W. (1979). A cluster separation measure. <em>IEEE Transactions on Pattern
+                Analysis and Machine Intelligence</em>, (2), 224-227.</p>
     </div>
 
 </body>
