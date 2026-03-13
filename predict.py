@@ -38,7 +38,7 @@ def predict_structure(atoms, config, models):
     if n_carbon == 0:
         return None, "No Carbon atoms found"
 
-    # SOAP
+    # SOAP (per-atom, then aggregate with mean + std)
     soap = SOAP(
         species=config['soap_species'],
         r_cut=config['soap_rcut'],
@@ -48,7 +48,12 @@ def predict_structure(atoms, config, models):
         average=config['soap_average'],
         periodic=True,
     )
-    features = soap.create(atoms).reshape(1, -1)
+    atom_features = soap.create(atoms)  # (n_atoms, D)
+    if atom_features.ndim == 1:
+        atom_features = atom_features.reshape(1, -1)
+    feat_mean = atom_features.mean(axis=0)
+    feat_std = atom_features.std(axis=0)
+    features = np.concatenate([feat_mean, feat_std]).reshape(1, -1)
 
     # Scale
     scaled = models['scaler'].transform(features)

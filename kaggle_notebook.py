@@ -87,7 +87,7 @@ class Config:
     SOAP_NMAX        = 8      # Radial basis resolution
     SOAP_LMAX        = 6      # Angular basis resolution
     SOAP_SIGMA       = 0.5    # Gaussian smearing width (Å) — tighter for crystalline C
-    SOAP_AVERAGE     = 'inner'  # Average over sites → 1 descriptor per structure
+    SOAP_AVERAGE     = 'off'  # No averaging → 1 descriptor per atom
     BATCH_SIZE       = 512
 
     # --- PCA (Stage 3) ---
@@ -435,7 +435,8 @@ def compute_soap_to_hdf5(structures, config):
       1. Gaussian smearing of atomic positions (sigma)
       2. Radial Rn(r) + Spherical harmonics Ylm(theta, phi)
       3. Power spectrum (rotation-invariant)
-      4. Inner average over all C atoms -> single vector per structure
+      4. Per-atom descriptors (average='off') -> aggregate via mean+std
+         concatenation -> single 2*D vector per structure
     """
     soap = SOAP(
         species=config.SOAP_SPECIES, r_cut=config.SOAP_RCUT,
@@ -443,10 +444,12 @@ def compute_soap_to_hdf5(structures, config):
         sigma=config.SOAP_SIGMA, average=config.SOAP_AVERAGE, periodic=True,
     )
     n_structs = len(structures)
-    n_feat = soap.get_number_of_features()
+    n_feat_raw = soap.get_number_of_features()
+    n_feat = 2 * n_feat_raw  # mean + std concatenation
     batch_size = config.BATCH_SIZE
 
-    print(f"[SOAP] {n_structs} structures, {n_feat} features, batch={batch_size}")
+    print(f"[SOAP] {n_structs} structures, {n_feat_raw} raw features per atom")
+    print(f"[SOAP] Aggregation: mean + std -> {n_feat} features per structure")
     print(f"[SOAP] species={config.SOAP_SPECIES}, n_max={config.SOAP_NMAX}, "
           f"l_max={config.SOAP_LMAX}, r_cut={config.SOAP_RCUT}A, "
           f"sigma={config.SOAP_SIGMA}")
@@ -465,11 +468,14 @@ def compute_soap_to_hdf5(structures, config):
             end = min(start + batch_size, n_structs)
             batch = structures[start:end]
 
-            # Compute SOAP for batch
-            batch_features = soap.create(batch, n_jobs=1)
-            if batch_features.ndim == 1:
-                batch_features = batch_features.reshape(1, -1)
-            dset[start:end] = batch_features.astype(np.float32)
+            # Compute per-atom SOAP and aggregate per structure
+            for i, struct in enumerate(batch):
+                atom_features = soap.create(struct)  # (n_atoms, D)
+                if atom_features.ndim == 1:
+                    atom_features = atom_features.reshape(1, -1)
+                feat_mean = atom_features.mean(axis=0)
+                feat_std = atom_features.std(axis=0)
+                dset[start + i] = np.concatenate([feat_mean, feat_std]).astype(np.float32)
 
             elapsed = time.time() - start_time
             rate = end / elapsed if elapsed > 0 else 0

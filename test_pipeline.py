@@ -153,44 +153,56 @@ def test_carbon_filter_preserves_coords():
                 f"Positions should match. Got {filtered.positions}")
 
 
-@test("Stage 2: SOAP descriptor — correct output shape")
+@test("Stage 2: SOAP descriptor — correct output shape (per-atom)")
 def test_soap_shape():
     soap = SOAP(
         species=['C'], r_cut=6.0, n_max=8, l_max=8,
-        sigma=1.0, average='inner', periodic=False,
+        sigma=1.0, average='off', periodic=False,
     )
     n_feat = soap.get_number_of_features()
 
-    mol = make_carbon_molecule(n_carbon=5)
+    n_atoms = 5
+    mol = make_carbon_molecule(n_carbon=n_atoms)
     features = soap.create(mol)
 
-    assert_eq(features.ndim, 1, "Single molecule SOAP should be 1D (averaged)")
-    assert_eq(features.shape[0], n_feat, f"Feature dim should be {n_feat}")
+    assert_eq(features.ndim, 2, "Per-atom SOAP should be 2D (n_atoms, D)")
+    assert_eq(features.shape, (n_atoms, n_feat), f"Shape should be ({n_atoms}, {n_feat})")
     assert_true(np.isfinite(features).all(), "SOAP features should be finite")
-    print(f"(D={n_feat})", end=' ')
+
+    # Aggregate via mean + std
+    agg = np.concatenate([features.mean(axis=0), features.std(axis=0)])
+    assert_eq(agg.shape[0], 2 * n_feat, f"Aggregated dim should be {2 * n_feat}")
+    print(f"(D_raw={n_feat}, D_agg={2*n_feat})", end=' ')
 
 
-@test("Stage 2: SOAP descriptor — batch computation")
+@test("Stage 2: SOAP descriptor — per-structure aggregation")
 def test_soap_batch():
     soap = SOAP(
         species=['C'], r_cut=6.0, n_max=8, l_max=8,
-        sigma=1.0, average='inner', periodic=False,
+        sigma=1.0, average='off', periodic=False,
     )
     n_feat = soap.get_number_of_features()
 
     molecules = [make_carbon_molecule(n_carbon=np.random.randint(2, 9)) for _ in range(20)]
-    features = soap.create(molecules)
+    aggregated = []
+    for mol in molecules:
+        atom_feat = soap.create(mol)
+        if atom_feat.ndim == 1:
+            atom_feat = atom_feat.reshape(1, -1)
+        agg = np.concatenate([atom_feat.mean(axis=0), atom_feat.std(axis=0)])
+        aggregated.append(agg)
+    features = np.array(aggregated)
 
-    assert_eq(features.shape, (20, n_feat), f"Batch shape should be (20, {n_feat})")
+    assert_eq(features.shape, (20, 2 * n_feat), f"Aggregated batch shape should be (20, {2 * n_feat})")
     assert_true(np.isfinite(features).all(), "All features should be finite")
 
 
-@test("Stage 2: SOAP — rotation invariance")
+@test("Stage 2: SOAP — rotation invariance (aggregated)")
 def test_soap_rotation_invariance():
-    """SOAP descriptors should be identical for rotated molecules."""
+    """Aggregated SOAP descriptors should be identical for rotated molecules."""
     soap = SOAP(
         species=['C'], r_cut=6.0, n_max=8, l_max=8,
-        sigma=1.0, average='inner', periodic=False,
+        sigma=1.0, average='off', periodic=False,
     )
 
     positions = np.array([[0, 0, 0], [1.5, 0, 0], [0, 1.5, 0], [1.5, 1.5, 0.0]], dtype=float)
@@ -204,11 +216,13 @@ def test_soap_rotation_invariance():
     rotated_positions = positions @ R.T
     mol2 = Atoms(symbols=['C'] * 4, positions=rotated_positions)
 
-    feat1 = soap.create(mol1)
-    feat2 = soap.create(mol2)
+    raw1 = soap.create(mol1)
+    raw2 = soap.create(mol2)
+    feat1 = np.concatenate([raw1.mean(axis=0), raw1.std(axis=0)])
+    feat2 = np.concatenate([raw2.mean(axis=0), raw2.std(axis=0)])
 
     diff = np.max(np.abs(feat1 - feat2))
-    assert_true(diff < 1e-6, f"SOAP should be rotation-invariant. Max diff={diff:.2e}")
+    assert_true(diff < 1e-6, f"Aggregated SOAP should be rotation-invariant. Max diff={diff:.2e}")
 
 
 @test("Stage 3: Welford Scaler — correct mean and std")
@@ -324,12 +338,19 @@ def test_full_flow():
     type_b = [make_carbon_molecule(n_carbon=7, spread=4.0) for _ in range(30)]
     molecules = type_a + type_b
 
-    # SOAP
+    # SOAP (per-atom, aggregated via mean + std)
     soap = SOAP(
         species=['C'], r_cut=6.0, n_max=8, l_max=8,
-        sigma=1.0, average='inner', periodic=False,
+        sigma=1.0, average='off', periodic=False,
     )
-    features = soap.create(molecules)
+    aggregated = []
+    for mol in molecules:
+        atom_feat = soap.create(mol)
+        if atom_feat.ndim == 1:
+            atom_feat = atom_feat.reshape(1, -1)
+        agg = np.concatenate([atom_feat.mean(axis=0), atom_feat.std(axis=0)])
+        aggregated.append(agg)
+    features = np.array(aggregated)
     assert_eq(features.shape[0], 60, "Should have 60 feature vectors")
 
     # Scale

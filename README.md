@@ -38,13 +38,15 @@ Traditional structural analysis methods — radial distribution functions (RDF),
 
 ```mermaid
 graph LR
-    A["carbon-data<br/>(22.9M atoms)"] --> B["SOAP Encoding<br/>R → p ∈ ℝ²⁵²"]
-    B --> C["Welford Scaler<br/>z = (x−μ)/σ"]
-    C --> D["Incremental PCA<br/>252 → 15 dims"]
+    A["carbon-data<br/>(22.9M atoms)"] --> B["SOAP Encoding<br/>R → p ∈ ℝ²⁵²/atom"]
+    B --> B2["Mean+Std Agg.<br/>→ ℝ⁵⁰⁴/structure"]
+    B2 --> C["Welford Scaler<br/>z = (x−μ)/σ"]
+    C --> D["Incremental PCA<br/>504 → k dims"]
     D --> E["K-Means++<br/>K = 3"]
 
     style A fill:#1565C0,color:#fff
     style B fill:#E65100,color:#fff
+    style B2 fill:#F57C00,color:#fff
     style C fill:#6A1B9A,color:#fff
     style D fill:#00695C,color:#fff
     style E fill:#C62828,color:#fff
@@ -53,8 +55,8 @@ graph LR
 | Stage | Input → Output | Method | Scientific Justification |
 |:-----:|----------------|--------|--------------------------|
 | 1 | `.extxyz` → `ASE.Atoms` | Parse MD trajectory snapshots | Preserves periodic boundary conditions, density, and temperature metadata |
-| 2 | `R ∈ ℝ^(N×3)` → `p ∈ ℝ^D` | SOAP power spectrum | Rotation-invariant encoding of 3-body correlations up to 6.0 Å |
-| 3 | `X ∈ ℝ^(M×252)` → `Z ∈ ℝ^(M×15)` | Welford + IPCA | Online standardization prevents feature dominance; PCA embeds the structural manifold |
+| 2 | `R ∈ ℝ^(N×3)` → `p ∈ ℝ^(2D)` | SOAP power spectrum (per-atom) + mean/std aggregation | Per-atom descriptors preserve local geometric detail; mean+std concatenation captures both the average environment and its heterogeneity within each structure |
+| 3 | `X ∈ ℝ^(M×504)` → `Z ∈ ℝ^(M×k)` | Welford + IPCA | Online standardization prevents feature dominance; PCA embeds the structural manifold |
 | 4 | `Z` → `L ∈ {0,1,2}^M` | MiniBatch K-Means++ | Silhouette-optimized partitioning of the embedded geometric space |
 
 ---
@@ -109,7 +111,16 @@ Rotational invariance is achieved by constructing the **power spectrum**:
 p(n, n', l) ∝ Σₘ cₙₗₘ* · cₙ'ₗₘ
 ```
 
-This yields a vector whose dimensionality is `nₘₐₓ(nₘₐₓ+1)/2 × (lₘₐₓ+1)`. With our parameters, this equals **36 × 7 = 252 features**.
+This yields a vector whose dimensionality is `nₘₐₓ(nₘₐₓ+1)/2 × (lₘₐₓ+1)`. With our parameters, this equals **36 × 7 = 252 features per atom**.
+
+### Aggregation Strategy
+
+With `average='off'`, each atom produces its own 252-dimensional descriptor. To obtain a fixed-size structure-level representation, we concatenate two statistics computed across all atoms:
+
+- **Mean**: captures the average local environment across the structure
+- **Standard deviation**: captures the heterogeneity/disorder of local environments
+
+This yields **2 × 252 = 504 features per structure**, encoding both the typical geometry and its variability — a richer representation than simple inner-averaging.
 
 ### Parameter Choices
 
@@ -121,7 +132,7 @@ This yields a vector whose dimensionality is `nₘₐₓ(nₘₐₓ+1)/2 × (l�
 | `l_max` | 6 | Captures angular correlations up to hexagonal symmetry (l=6), essential for detecting the 6-fold rings of graphitic carbon |
 | `sigma` | 0.5 Å | Tight Gaussian smearing preserves sharp features in crystalline/ordered regions without over-broadening localized defect geometries |
 | `periodic` | `True` | Mandatory: all structures were generated under periodic boundary conditions (PBC) |
-| `average` | `inner` | Inner-averaging over atomic sites within each structure preserves cross-correlation information between different local environments |
+| `average` | `off` | No per-structure averaging — each atom produces its own descriptor, enabling richer statistical aggregation (mean + std) |
 
 ---
 
@@ -129,13 +140,13 @@ This yields a vector whose dimensionality is `nₘₐₓ(nₘₐₓ+1)/2 × (l�
 
 ### The Curse of Dimensionality
 
-Euclidean distances become increasingly unreliable in high-dimensional spaces — a phenomenon well-documented in machine learning theory. In 252 dimensions, pairwise distances concentrate around a narrow band, severely degrading the discriminative power of distance-based clustering algorithms. Dimensionality reduction is therefore not optional but **mathematically necessary**.
+Euclidean distances become increasingly unreliable in high-dimensional spaces — a phenomenon well-documented in machine learning theory. In 504 dimensions (mean + std aggregation of 252-d SOAP), pairwise distances concentrate around a narrow band, severely degrading the discriminative power of distance-based clustering algorithms. Dimensionality reduction is therefore not optional but **mathematically necessary**.
 
 ### Incremental PCA
 
-We apply **Incremental Principal Component Analysis (IPCA)** to project the standardized 252-dimensional SOAP vectors onto their principal variance axes. The algorithm processes data in memory-efficient batches, critical for large-scale datasets.
+We apply **Incremental Principal Component Analysis (IPCA)** to project the standardized 504-dimensional SOAP feature vectors (mean + std concatenation) onto their principal variance axes. The algorithm processes data in memory-efficient batches, critical for large-scale datasets.
 
-**Empirical finding**: Exactly **15 principal components** are required to retain ≥95% of the cumulative variance. This is notably higher than the 3–5 components typically sufficient for simple molecular datasets (e.g., QM9), reflecting the genuine structural complexity of the amorphous carbon phase continuum.
+**Empirical finding**: The number of principal components required to retain ≥95% of the cumulative variance is typically higher than with inner-averaged descriptors, reflecting the additional heterogeneity information captured by the std component.
 
 ---
 

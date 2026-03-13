@@ -63,7 +63,7 @@ def export_models(checkpoint_dir='./checkpoints', output_dir='./models'):
         'soap_nmax': 8,
         'soap_lmax': 8,
         'soap_sigma': 1.0,
-        'soap_average': 'inner',
+        'soap_average': 'off',
         'pca_n_components': pca_meta.get('n_components'),
         'best_k': kmeans_meta.get('best_k'),
         'n_carbon_molecules': carbon_meta.get('n_carbon_molecules'),
